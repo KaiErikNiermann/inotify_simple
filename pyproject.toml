@@ -54,7 +54,6 @@ ignore = [
     "D203",  # conflicts with D211
     "D213",  # conflicts with D212
     "TRY003",  # long messages in exception constructors are fine here
-    "ANN",  # enabled again together with strict typing
 ]
 
 [tool.ruff.lint.mccabe]

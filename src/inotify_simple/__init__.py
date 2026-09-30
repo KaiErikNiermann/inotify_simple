@@ -1,7 +1,6 @@
 """A simple wrapper around inotify using ctypes."""
 
 import os
-from collections import namedtuple
 from ctypes import CDLL, c_int, get_errno
 from ctypes.util import find_library
 from enum import IntEnum
@@ -13,15 +12,29 @@ from select import poll
 from struct import calcsize, unpack_from
 from termios import FIONREAD
 from time import sleep
+from typing import TYPE_CHECKING, NamedTuple, Self
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from _typeshed import StrOrBytesPath
 
 __version__ = "2.0.1"
 
 __all__ = ["Event", "INotify", "flags", "masks", "parse_events"]
 
-_libc = None
+_libc: CDLL | None = None
 
 
-def _libc_call(function, *args):
+def _get_libc() -> CDLL:
+    """Load libc on first use."""
+    global _libc  # noqa: PLW0603
+    if _libc is None:
+        _libc = CDLL(find_library("c"), use_errno=True)
+    return _libc
+
+
+def _libc_call[*Ts](function: Callable[[*Ts], int], *args: *Ts) -> int:
     """Wrapper which raises errors and retries on EINTR."""
     while True:
         rc = function(*args)
@@ -32,10 +45,18 @@ def _libc_call(function, *args):
             raise OSError(errno, os.strerror(errno))
 
 
-#: A ``namedtuple`` (wd, mask, cookie, name) for an inotify event. The
-#: :attr:`~inotify_simple.Event.name` field is a ``str`` decoded with
-#: ``os.fsdecode()``.
-Event = namedtuple("Event", ["wd", "mask", "cookie", "name"])
+class Event(NamedTuple):
+    """A ``namedtuple`` (wd, mask, cookie, name) for an inotify event.
+
+    The :attr:`~inotify_simple.Event.name` field is a ``str`` decoded with
+    ``os.fsdecode()``.
+    """
+
+    wd: int
+    mask: int
+    cookie: int
+    name: str
+
 
 _EVENT_FMT = "iIII"
 _EVENT_SIZE = calcsize(_EVENT_FMT)
@@ -50,7 +71,12 @@ class INotify(FileIO):
     #: :func:`~inotify_simple.INotify.fileno`
     fd = property(FileIO.fileno)
 
-    def __init__(self, inheritable=False, nonblocking=False, closefd=True):
+    def __init__(
+        self,
+        inheritable: bool = False,
+        nonblocking: bool = False,
+        closefd: bool = True,
+    ) -> None:
         """File-like object wrapping ``inotify_init1()``.
 
         Raises ``OSError`` on failure.
@@ -80,15 +106,13 @@ class INotify(FileIO):
                 object is garbage collected or when
                 :func:`~inotify_simple.INotify.close` is called.
         """
-        global _libc  # noqa: PLW0603
-        _libc = _libc or CDLL(find_library("c"), use_errno=True)
         flags = (not inheritable) * os.O_CLOEXEC | bool(nonblocking) * os.O_NONBLOCK
-        fd = _libc_call(_libc.inotify_init1, flags)
+        fd = _libc_call(_get_libc().inotify_init1, flags)
         super().__init__(fd, mode="rb", closefd=closefd)
         self._poller = poll()
         self._poller.register(self.fileno())
 
-    def add_watch(self, path, mask):
+    def add_watch(self, path: StrOrBytesPath, mask: int) -> int:
         """Wrapper around ``inotify_add_watch()``.
 
         Returns the watch descriptor or raises an ``OSError`` on failure.
@@ -103,37 +127,41 @@ class INotify(FileIO):
         Returns:
             int: watch descriptor
         """
-        return _libc_call(_libc.inotify_add_watch, self.fileno(), fsencode(path), mask)
+        return _libc_call(
+            _get_libc().inotify_add_watch, self.fileno(), fsencode(path), mask
+        )
 
-    def rm_watch(self, wd):
+    def rm_watch(self, wd: int) -> None:
         """Wrapper around ``inotify_rm_watch()``. Raises ``OSError`` on failure.
 
         Args:
             wd (int): The watch descriptor to remove
         """
-        _libc_call(_libc.inotify_rm_watch, self.fileno(), wd)
+        _libc_call(_get_libc().inotify_rm_watch, self.fileno(), wd)
 
-    def read(self, timeout=None, read_delay=None):
+    def read(
+        self, timeout: int | None = None, read_delay: float | None = None
+    ) -> list[Event]:
         """Read the inotify file descriptor and return the resulting events.
 
         The events are :attr:`~inotify_simple.Event` namedtuples (wd, mask, cookie,
         name).
 
         Args:
-            timeout (int): The time in milliseconds to wait for events if there are
-                none. If negative or ``None``, block until there are events. If zero,
-                return immediately if there are no events to be read.
+            timeout (int | None): The time in milliseconds to wait for events if there
+                are none. If negative or ``None``, block until there are events. If
+                zero, return immediately if there are no events to be read.
 
-            read_delay (int): If there are no events immediately available for reading,
-                then this is the time in milliseconds to wait after the first event
-                arrives before reading the file descriptor. This allows further events
-                to accumulate before reading, which allows the kernel to coalesce like
-                events and can decrease the number of events the application needs to
-                process. However, this also increases the risk that the event queue will
-                overflow due to not being emptied fast enough.
+            read_delay (float | None): If there are no events immediately available for
+                reading, then this is the time in milliseconds to wait after the first
+                event arrives before reading the file descriptor. This allows further
+                events to accumulate before reading, which allows the kernel to coalesce
+                like events and can decrease the number of events the application needs
+                to process. However, this also increases the risk that the event queue
+                will overflow due to not being emptied fast enough.
 
         Returns:
-            generator: generator producing :attr:`~inotify_simple.Event` namedtuples
+            list: list of :attr:`~inotify_simple.Event` namedtuples
 
         .. warning::
             If the same inotify file descriptor is being read by multiple threads
@@ -150,7 +178,7 @@ class INotify(FileIO):
             data = self._readall()
         return parse_events(data)
 
-    def _readall(self):
+    def _readall(self) -> bytes:
         bytes_avail = c_int()
         ioctl(self, FIONREAD, bytes_avail)
         if not bytes_avail.value:
@@ -158,7 +186,7 @@ class INotify(FileIO):
         return os.read(self.fileno(), bytes_avail.value)
 
 
-def parse_events(data):
+def parse_events(data: bytes) -> list[Event]:
     """Unpack data read from an inotify file descriptor into events.
 
     The events are :attr:`~inotify_simple.Event` namedtuples (wd, mask, cookie, name).
@@ -172,7 +200,7 @@ def parse_events(data):
         list: list of :attr:`~inotify_simple.Event` namedtuples
     """
     pos = 0
-    events = []
+    events: list[Event] = []
     while pos < len(data):
         wd, mask, cookie, namesize = unpack_from(_EVENT_FMT, data, pos)
         pos += _EVENT_SIZE + namesize
@@ -213,7 +241,7 @@ class flags(IntEnum):
     ONESHOT = 0x80000000  #: only send event once
 
     @classmethod
-    def from_mask(cls, mask):
+    def from_mask(cls, mask: int) -> list[Self]:
         """Convenience method that returns a list of every flag in a mask."""
         return [flag for flag in cls.__members__.values() if flag & mask]
 
