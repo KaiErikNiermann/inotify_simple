@@ -89,15 +89,13 @@ class TestINotify:
         with pytest.raises(FileNotFoundError):
             inotify.add_watch("/nonexistent/for/inotify", flags.CREATE)
 
-    def test_rm_watch_generates_ignored(
-        self, inotify: INotify, tmp_path: Path
-    ) -> None:
+    def test_rm_watch_generates_ignored(self, inotify: INotify, tmp_path: Path) -> None:
         wd = inotify.add_watch(tmp_path, flags.CREATE)
         inotify.rm_watch(wd)
         assert [e.mask for e in inotify.read(timeout=1000)] == [flags.IGNORED]
 
     def test_rm_watch_invalid_wd_raises(self, inotify: INotify) -> None:
-        with pytest.raises(OSError) as info:
+        with pytest.raises(OSError, match="Invalid argument") as info:
             inotify.rm_watch(12345)
         assert info.value.errno == errno.EINVAL
 
@@ -131,9 +129,8 @@ class TestINotify:
         assert flags.from_mask(event.mask) == [flags.CREATE, flags.ISDIR]
 
     def test_nonblocking_raw_read_raises(self, tmp_path: Path) -> None:
-        with INotify(nonblocking=True) as instance:
-            with pytest.raises(BlockingIOError):
-                os.read(instance.fileno(), 1024)
+        with INotify(nonblocking=True) as instance, pytest.raises(BlockingIOError):
+            os.read(instance.fileno(), 1024)
 
     def test_inheritable(self) -> None:
         with INotify() as default, INotify(inheritable=True) as inherited:
@@ -147,7 +144,7 @@ class TestINotify:
         with INotify() as instance:
             fd = instance.fileno()
         assert instance.closed
-        with pytest.raises(OSError):
+        with pytest.raises(OSError, match="Bad file descriptor"):
             os.fstat(fd)
 
     def test_closefd_false_leaves_descriptor_open(self) -> None:

@@ -32,8 +32,44 @@ dev = [
     "ruff>=0.13",
     "radon>=6",
     "pyright>=1.1.400",
+    "xenon>=0.9",
 ]
 docs = [
     "sphinx",
     "sphinx-rtd-theme",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+src = ["src", "tests"]
+extend-exclude = ["README.md"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W", "F", "I", "N", "UP", "B", "A", "C4", "C90", "SIM", "RET", "PL",
+    "PT", "PTH", "RUF", "TRY", "S", "ANN", "D", "PERF", "FURB", "TC",
+]
+ignore = [
+    "D203",  # conflicts with D211
+    "D213",  # conflicts with D212
+    "TRY003",  # long messages in exception constructors are fine here
+    "ANN",  # enabled again together with strict typing
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "D", "PLR2004", "ANN401"]
+"src/inotify_simple/__init__.py" = ["N801"]  # flags/masks/INotify are public API
+"example.py" = ["S", "D", "T20", "INP001"]
+"docs/**" = ["D", "INP001", "A001", "PTH"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "strict"
+pythonVersion = "3.14"
