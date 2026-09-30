@@ -1,7 +1,7 @@
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath('..'))
+sys.path.insert(0, os.path.abspath('../src'))
 
 from inotify_simple import __version__
 
@@ -26,7 +26,7 @@ html_theme = 'sphinx_rtd_theme'
 
 
 # Make full source as a separate file:
-with open('../inotify_simple.py') as f:
+with open('../src/inotify_simple/__init__.py') as f:
     with open('fullsource.py', 'w') as g:
         docstring = False
         prev_line_blank = False

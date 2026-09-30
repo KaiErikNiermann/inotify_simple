@@ -1,30 +1,39 @@
 [build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-py-modules = ["inotify_simple"]
+requires = ["poetry-core>=2.0"]
+build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "inotify-simple"
+version = "2.0.1"
 description = "A simple wrapper around inotify. No fancy bells and whistles, just a literal wrapper with ctypes. Under 100 lines of code!"
-authors = [
-    {name = "Chris Billington", email = "chrisjbillington@gmail.com"},
-]
-keywords = ["inotify"]
+authors = [{ name = "Chris Billington", email = "chrisjbillington@gmail.com" }]
+readme = "README.md"
 license = "BSD-2-Clause"
 license-files = ["LICENSE"]
-requires-python = ">=3.6"
-dynamic = ["version"]
-
-[tool.setuptools.dynamic]
-version = {attr = "inotify_simple.__version__"}
-
-[project.readme]
-file = "README.md"
-content-type = "text/markdown"
+keywords = ["inotify"]
+requires-python = ">=3.14"
+classifiers = [
+    "Operating System :: POSIX :: Linux",
+    "Typing :: Typed",
+]
 
 [project.urls]
 Repository = "https://github.com/chrisjbillington/inotify_simple.git"
 Documentation = "http://inotify-simple.readthedocs.io/"
 Issues = "https://github.com/chrisjbillington/inotify_simple/issues"
+
+[tool.poetry]
+packages = [{ include = "inotify_simple", from = "src" }]
+include = [{ path = "src/inotify_simple/py.typed", format = ["sdist", "wheel"] }]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff>=0.13",
+    "radon>=6",
+    "pyright>=1.1.400",
+]
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme",
+]

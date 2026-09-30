@@ -9,7 +9,7 @@ file descriptor. `INotify().read()` reads available data from the file descripto
 returns events as `namedtuple` objects after unpacking them with the `struct` module.
 `inotify_add_watch()` and `inotify_rm_watch()` are wrapped with no changes at all,
 taking and returning watch descriptor integers that calling code is expected to keep
-track of itself, just as one would use `inotify` from C. Requires Python 3.6 or higher.
+track of itself, just as one would use `inotify` from C. Requires Python 3.14 or higher.
 
 [View on PyPI](http://pypi.python.org/pypi/inotify-simple) |
 [View on GitHub](https://github.com/chrisjbillington/inotify_simple) |
