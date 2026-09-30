@@ -1,6 +1,7 @@
 import errno
 import os
 import struct
+import subprocess
 import tomllib
 from pathlib import Path
 
@@ -161,3 +162,16 @@ def test_version_matches_pyproject() -> None:
     pyproject = Path(__file__).parents[1] / "pyproject.toml"
     declared = tomllib.loads(pyproject.read_text())["project"]["version"]
     assert inotify_simple.__version__ == declared
+
+
+def test_first_instance_spawns_no_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Loading libc must not shell out to ``ldconfig`` (ctypes.util.find_library)."""
+
+    def forbidden(*args: object, **kwargs: object) -> None:
+        msg = "a subprocess was started while creating INotify"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(inotify_simple, "_libc", None)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    with INotify() as instance:
+        assert instance.fileno() >= 0

@@ -2,7 +2,6 @@
 
 import os
 from ctypes import CDLL, c_int, get_errno
-from ctypes.util import find_library
 from enum import IntEnum
 from errno import EINTR
 from fcntl import ioctl
@@ -27,10 +26,14 @@ _libc: CDLL | None = None
 
 
 def _get_libc() -> CDLL:
-    """Load libc on first use."""
+    """Load libc on first use.
+
+    ``CDLL(None)`` dlopens the running program, which already has libc mapped, so
+    unlike ``ctypes.util.find_library("c")`` it does not spawn ``ldconfig``.
+    """
     global _libc  # noqa: PLW0603
     if _libc is None:
-        _libc = CDLL(find_library("c"), use_errno=True)
+        _libc = CDLL(None, use_errno=True)
     return _libc
 
 
